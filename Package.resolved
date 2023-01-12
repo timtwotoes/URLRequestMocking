@@ -1,0 +1,14 @@
+{
+  "pins" : [
+    {
+      "identity" : "urlprotocolextensions",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/timtwotoes/URLProtocolExtensions",
+      "state" : {
+        "revision" : "6b3abd42e36b66dbae51d6660f33d0cded647715",
+        "version" : "1.0.0"
+      }
+    }
+  ],
+  "version" : 2
+}
