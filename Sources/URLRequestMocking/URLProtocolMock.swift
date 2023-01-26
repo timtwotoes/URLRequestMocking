@@ -15,6 +15,8 @@ class URLProtocolMock: URLProtocol {
         }
     }
     
+    internal static var mock: (any URLRequestMocking)?
+    
     override public class func canInit(with task: URLSessionTask) -> Bool {
         return true
     }
@@ -22,7 +24,13 @@ class URLProtocolMock: URLProtocol {
     public let mock: any URLRequestMocking
 
     override public init(request: URLRequest, cachedResponse: CachedURLResponse?, client: URLProtocolClient?) {
-        mock = request.mock != nil ? request.mock! : ExceptionMock()
+        if request.mock != nil {
+            mock = request.mock!
+        } else if URLProtocolMock.mock != nil {
+            mock = URLProtocolMock.mock!
+        } else {
+            mock = ExceptionMock()
+        }
         super.init(request: request, cachedResponse: cachedResponse, client: client)
     }
     
