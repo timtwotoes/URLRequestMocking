@@ -27,4 +27,25 @@ final class URLRequestMockingTests: XCTestCase {
         XCTAssertTrue((invalidResponse as! HTTPURLResponse).statusCode == 401)
         XCTAssertEqual(String(data: invalidData, encoding: .utf8), "Not found!")
     }
+    
+    func testURLSessionConfigurationMock() async throws {
+        let mock = URLRequestMock { request in
+            if request.url?.absoluteString == "https://apple.com" {
+                let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+                return (response, "Success".data(using: .utf8)!)
+            } else {
+                let response = HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!
+                return (response, "Failure".data(using: .utf8)!)
+            }
+        }
+        let session = URLSession(configuration: .mock(for: .ephemeral, using: mock))
+        
+        let (successData, successResponse) = try await session.data(for: URLRequest(url: URL(string: "https://apple.com")!))
+        XCTAssertTrue((successResponse as! HTTPURLResponse).statusCode == 200)
+        XCTAssertEqual(String(data: successData, encoding: .utf8), "Success")
+        
+        let (failureData, failureResponse) = try await session.data(for: URLRequest(url: URL(string: "https://microsoft.com")!))
+        XCTAssertTrue((failureResponse as! HTTPURLResponse).statusCode == 404)
+        XCTAssertEqual(String(data: failureData, encoding: .utf8), "Failure")
+    }
 }
