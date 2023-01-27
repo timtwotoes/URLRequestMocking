@@ -7,7 +7,7 @@
 
 import Foundation
 
-class URLProtocolMock: URLProtocol {
+internal final class URLProtocolMock: URLProtocol {
     
     internal struct ExceptionMock: URLRequestMocking {
         func response(for request: URLRequest) throws -> (response: URLResponse, data: Data)? {
