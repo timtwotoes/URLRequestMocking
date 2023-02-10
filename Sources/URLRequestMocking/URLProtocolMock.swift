@@ -11,7 +11,11 @@ internal final class URLProtocolMock: URLProtocol {
     
     internal struct ExceptionMock: URLRequestMocking {
         func response(for request: URLRequest) throws -> (response: URLResponse, data: Data)? {
-            throw URLRequestMockingError.unexpectedRequest(request)
+            var userInfo = [String : Any]()
+            userInfo[NSURLErrorFailingURLErrorKey] = request.url!
+            userInfo[NSURLErrorFailingURLStringErrorKey] = request.url!.absoluteString
+            userInfo[NSLocalizedDescriptionKey] = "No mock set on either URLSession or URLRequest"
+            throw URLError(.unsupportedURL, userInfo: userInfo)
         }
     }
     
@@ -45,7 +49,12 @@ internal final class URLProtocolMock: URLProtocol {
                 client?.urlProtocol(self, didLoad: response.data)
                 client?.urlProtocolDidFinishLoading(self)
             } else {
-                client?.urlProtocol(self, didFailWithError: URLRequestMockingError.unexpectedRequest(request))
+                var userInfo = [String : Any]()
+                userInfo[NSURLErrorFailingURLErrorKey] = request.url!
+                userInfo[NSURLErrorFailingURLStringErrorKey] = request.url!.absoluteString
+                userInfo[NSLocalizedDescriptionKey] = "No mock found for \(request.url!.absoluteString)"
+
+                client?.urlProtocol(self, didFailWithError: URLError(.unsupportedURL, userInfo: userInfo))
             }
         } catch let error {
             client?.urlProtocol(self, didFailWithError: error)

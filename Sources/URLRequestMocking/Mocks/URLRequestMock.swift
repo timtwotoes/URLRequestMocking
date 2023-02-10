@@ -13,7 +13,7 @@ import Foundation
 public struct URLRequestMock: URLRequestMocking {
     public typealias Response = (response: URLResponse, data: Data)
     
-    private let mock: (URLRequest) -> Response?
+    private let mock: (URLRequest) throws -> Response?
     
     /// Constructor that creates a mock from a closure.
     ///
@@ -34,11 +34,11 @@ public struct URLRequestMock: URLRequestMocking {
     /// If nil is returned, meaning no response is returned, the URLSession will throw an URLRequestMockingError.
     ///
     /// - Parameter builder: a closure that produces a response from an URLRequest.
-    public init(_ builder: @escaping (URLRequest) -> Response?) {
+    public init(_ builder: @escaping (URLRequest) throws -> Response?) {
         mock = builder
     }
     
     public func response(for request: URLRequest) throws -> (response: URLResponse, data: Data)? {
-        return mock(request)
+        return try mock(request)
     }
 }
