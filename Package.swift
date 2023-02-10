@@ -24,6 +24,7 @@ let package = Package(
             dependencies: ["URLProtocolExtensions"]),
         .testTarget(
             name: "URLRequestMockingTests",
-            dependencies: ["URLRequestMocking"]),
+            dependencies: ["URLRequestMocking"],
+            resources: [.copy("Resources")])
     ]
 )

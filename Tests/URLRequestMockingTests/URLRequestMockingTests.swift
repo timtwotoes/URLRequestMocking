@@ -2,50 +2,82 @@ import XCTest
 @testable import URLRequestMocking
 
 final class URLRequestMockingTests: XCTestCase {
-    func testURLRequestMock() async throws {
-        let session = URLSession(configuration: .mock(for: .ephemeral))
-        var mockedRequest = URLRequest(url: URL(string: "https://example.com")!)
-        var unknownRequest = URLRequest(url: URL(string: "https://examples.com")!)
-        let mock = URLRequestMock { request in
-            if request.url?.absoluteString == "https://example.com" {
-                let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
-                return (response, "Success!".data(using: .utf8)!)
-            } else {
-                let response = HTTPURLResponse(url: request.url!, statusCode: 401, httpVersion: nil, headerFields: nil)!
-                return (response, "Not found!".data(using: .utf8)!)
+    private var session: URLSession!
+    private var cocktailDetailsResponseURL: URL!
+    private var searchByCocktailNameResponseURL: URL!
+    
+    override func setUpWithError() throws {
+        cocktailDetailsResponseURL = try XCTUnwrap(Bundle.module.url(forResource: "Resources/lookup-full-cocktail-details-response", withExtension: "json"))
+        searchByCocktailNameResponseURL = try XCTUnwrap(Bundle.module.url(forResource: "Resources/search-cocktail-by-name-response", withExtension: "json"))
+        
+        session = URLSession(configuration: .mock(for: .ephemeral, using: URLRequestMock { request in
+            switch request.url!.absoluteString {
+            case "www.thecocktaildb.com/api/json/v1/1/lookup.php?i=11001":
+                let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type" : "application/json"])!
+                return (response, try Data(contentsOf: self.cocktailDetailsResponseURL))
+            default: return nil
             }
-        }
-        
-        mockedRequest.mock = mock
-        unknownRequest.mock = mock
-        
-        let (successData, successResponse) = try await session.data(for: mockedRequest)
-        XCTAssertTrue((successResponse as! HTTPURLResponse).statusCode == 200)
-        XCTAssertEqual(String(data: successData, encoding: .utf8), "Success!")
-        
-        let (invalidData, invalidResponse) = try await session.data(for: unknownRequest)
-        XCTAssertTrue((invalidResponse as! HTTPURLResponse).statusCode == 401)
-        XCTAssertEqual(String(data: invalidData, encoding: .utf8), "Not found!")
+        }))
     }
     
-    func testURLSessionConfigurationMock() async throws {
+    override func tearDownWithError() throws {
+        session = nil
+        cocktailDetailsResponseURL = nil
+        searchByCocktailNameResponseURL = nil
+    }
+    
+    func testURLSessionMock() async throws {
+        let (data, response) = try await session.data(for: URLRequest(url: URL(string: "www.thecocktaildb.com/api/json/v1/1/lookup.php?i=11001")!))
+        XCTAssertTrue((response as! HTTPURLResponse).statusCode == 200)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String : Any])
+        let details = try XCTUnwrap(try XCTUnwrap(json["drinks"] as? [[String: String?]]).first)
+        XCTAssertEqual(details["strDrink"], "Old Fashioned")
+    }
+    
+    func testURLSessionMockOverride() async throws {
         let mock = URLRequestMock { request in
-            if request.url?.absoluteString == "https://apple.com" {
-                let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
-                return (response, "Success".data(using: .utf8)!)
-            } else {
-                let response = HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!
-                return (response, "Failure".data(using: .utf8)!)
+            switch request.url!.absoluteString {
+            case "www.thecocktaildb.com/api/json/v1/1/search.php?s=Old%20Fashioned":
+                let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type" : "appliation/json"])!
+                return (response, try Data(contentsOf: self.searchByCocktailNameResponseURL))
+            default: return nil
             }
         }
-        let session = URLSession(configuration: .mock(for: .ephemeral, using: mock))
         
-        let (successData, successResponse) = try await session.data(for: URLRequest(url: URL(string: "https://apple.com")!))
-        XCTAssertTrue((successResponse as! HTTPURLResponse).statusCode == 200)
-        XCTAssertEqual(String(data: successData, encoding: .utf8), "Success")
+        var request = URLRequest(url: URL(string: "www.thecocktaildb.com/api/json/v1/1/search.php?s=Old%20Fashioned")!)
         
-        let (failureData, failureResponse) = try await session.data(for: URLRequest(url: URL(string: "https://microsoft.com")!))
-        XCTAssertTrue((failureResponse as! HTTPURLResponse).statusCode == 404)
-        XCTAssertEqual(String(data: failureData, encoding: .utf8), "Failure")
+        do {
+            _ = try await session.data(for: request)
+        } catch let error as URLError {
+            XCTAssertTrue(error.code == .unsupportedURL)
+            XCTAssertEqual(error.failureURLString, "www.thecocktaildb.com/api/json/v1/1/search.php?s=Old%20Fashioned")
+            XCTAssertEqual(error.localizedDescription, "No mock found for \(request.url!.absoluteString)")
+        } catch let error {
+            XCTFail("Received unexpected error - \(error.localizedDescription)")
+        }
+        
+        request.mock = mock
+        
+        let (data, response) = try await session.data(for: request)
+        XCTAssertTrue((response as! HTTPURLResponse).statusCode == 200)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String : [Any]])
+        let drink = try XCTUnwrap(json["drinks"]?.first as? [String : String?])
+        let drinkName = try XCTUnwrap(drink["strDrink"])
+        XCTAssertEqual(drinkName, "Old Fashioned")
     }
+    
+    func testWithNoMock() async throws {
+        session = URLSession(configuration: .mock(for: .ephemeral))
+        do {
+            _ = try await session.data(for: URLRequest(url: URL(string: "www.thecocktaildb.com/api/json/v1/1/lookup.php?i=11001")!))
+            XCTFail("Unexpected response recieved - no mock set on URLSession")
+        } catch let error as URLError {
+            XCTAssertTrue(error.code == .unsupportedURL)
+            XCTAssertEqual(error.failureURLString, "www.thecocktaildb.com/api/json/v1/1/lookup.php?i=11001")
+            XCTAssertEqual(error.localizedDescription, "No mock set on either URLSession or URLRequest")
+        } catch let error {
+            XCTFail("Received unexpected error - \(error.localizedDescription)")
+        }
+    }
+    
 }
