@@ -6,8 +6,10 @@
 //
 
 import Foundation
+import OSLog
 
 internal final class URLProtocolMock: URLProtocol {
+    private let log = Logger(subsystem: Bundle.main.bundleIdentifier!, category: "mock")
     
     internal struct ExceptionMock: URLRequestMocking {
         func response(for request: URLRequest) throws -> (response: URLResponse, data: Data)? {
@@ -45,6 +47,7 @@ internal final class URLProtocolMock: URLProtocol {
     override public func startLoading() {
         do {
             if let response = try mock.response(for: request) {
+                log.debug("Sending response for \(self.request.url!.absoluteString, privacy: .public)")
                 client?.urlProtocol(self, didReceive: response.response , cacheStoragePolicy: .notAllowed)
                 client?.urlProtocol(self, didLoad: response.data)
                 client?.urlProtocolDidFinishLoading(self)
@@ -54,9 +57,11 @@ internal final class URLProtocolMock: URLProtocol {
                 userInfo[NSURLErrorFailingURLStringErrorKey] = request.url!.absoluteString
                 userInfo[NSLocalizedDescriptionKey] = "No mock found for \(request.url!.absoluteString)"
 
+                log.debug("No mock found for \(self.request.url!.absoluteString, privacy: .public)")
                 client?.urlProtocol(self, didFailWithError: URLError(.unsupportedURL, userInfo: userInfo))
             }
         } catch let error {
+            log.debug("Error loading \(self.request.url!.absoluteString, privacy: .public)")
             client?.urlProtocol(self, didFailWithError: error)
         }
     }
