@@ -59,3 +59,7 @@ Setting a mock on the URLSessionConfiguration can only be done for a single URLS
 Creating two URLSessionConfiguration objects with two different mocks, will override the mock on the
 first URLSessionConfiguration.
 
+## Requirements
+
+macOS 11 (Big Sur) or iOS 14
+Swift 5.7
